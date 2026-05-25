@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0a0a0f"/>
+<title>J.A.R.V.I.S</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surfaceHigh: #1a1a24;
+    --border: #1e1e2e;
+    --accent: #00d4ff;
+    --gold: #ffd166;
+    --green: #06ffa5;
+    --red: #ff4d6d;
+    --text: #e8e8f0;
+    --textSec: #6b6b8a;
+    --textMut: #3a3a52;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Mono', monospace;
+    max-width: 480px; margin: 0 auto;
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  ::-webkit-scrollbar { width: 0; }
+  input, select, button { font-family: inherit; }
+  select option { background: #111118; }
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.5); }
+
+  @keyframes pulse { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
+  @keyframes scanline { 0%{transform:translateY(-100%)} 100%{transform:translateY(100vh)} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes glow { 0%,100%{box-shadow:0 0 4px var(--accent)} 50%{box-shadow:0 0 12px var(--accent)} }
+
+  /* SCANLINE */
+  #scanline {
+    position: fixed; top:0; left:0; right:0; height:2px; z-index:999; pointer-events:none;
+    background: linear-gradient(transparent, rgba(0,212,255,.15), transparent);
+    animation: scanline 10s linear infinite;
+  }
+
+  /* TOPBAR */
+  #topbar {
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky; top:0; z-index:10;
+    flex-shrink: 0;
+  }
+  .topbar-inner { display:flex; justify-content:space-between; align-items:flex-start; }
+  .topbar-left .sys-label { display:flex; align-items:center; gap:8px; }
+  .glow-dot {
+    width:7px; height:7px; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 10px var(--accent);
+    animation: glow 2s ease-in-out infinite;
+  }
+  .sys-title { color:var(--accent); font-size:11px; font-weight:500; letter-spacing:3px; }
+  .sys-date { color:var(--textSec); font-size:11px; margin-top:4px; text-transform:capitalize; }
+  .topbar-right { text-align:right; }
+  .clock { color:var(--text); font-size:20px; font-weight:300; }
+  .sys-mini { color:var(--textMut); font-size:10px; margin-top:2px; }
+
+  /* CONTENT */
+  #content { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
+  .page { display:none; flex-direction:column; flex:1; }
+  .page.active { display:flex; }
+
+  /* BOTTOM NAV */
+  #bottomnav {
+    display:flex; border-top:1px solid var(--border);
+    background:var(--bg); flex-shrink:0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .nav-btn {
+    flex:1; padding:10px 4px 12px; background:none; border:none; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    border-top:2px solid transparent; transition:all .2s;
+  }
+  .nav-btn.active { border-top-color: var(--nav-color, var(--accent)); }
+  .nav-icon { font-size:18px; color:var(--textMut); transition:all .2s; }
+  .nav-btn.active .nav-icon { color:var(--nav-color, var(--accent)); filter:drop-shadow(0 0 6px var(--nav-color, var(--accent))); }
+  .nav-label { font-size:9px; color:var(--textMut); letter-spacing:1px; transition:all .2s; }
+  .nav-btn.active .nav-label { color:var(--nav-color, var(--accent)); font-weight:600; }
+
+  /* CARDS & INPUTS */
+  .card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:14px 16px;
+  }
+  .inp {
+    background:var(--surfaceHigh); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); padding:10px 12px; font-size:14px; font-family:inherit;
+    outline:none; width:100%;
+  }
+  .sel {
+    background:var(--surfaceHigh); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); padding:10px 12px; font-size:14px; font-family:inherit;
+    outline:none; width:100%;
+  }
+  .btn {
+    border-radius:8px; padding:10px 16px; font-size:14px; font-family:inherit;
+    cursor:pointer; font-weight:600; transition:all .15s; border:1px solid;
+  }
+  .btn-full { width:100%; }
+  .btn-small { padding:6px 12px; font-size:12px; }
+
+  .pill {
+    padding:4px 12px; border-radius:20px; border:1px solid var(--border);
+    background:transparent; color:var(--textSec); font-size:11px;
+    font-family:inherit; cursor:pointer; white-space:nowrap; transition:all .2s;
+  }
+  .pill.active { border-color:var(--pill-color, var(--accent)); background:color-mix(in srgb, var(--pill-color, var(--accent)) 13%, transparent); color:var(--pill-color, var(--accent)); }
+
+  /* PROGRESS BAR */
+  .progress-track { background:var(--surfaceHigh); border-radius:8px; height:6px; overflow:hidden; }
+  .progress-fill { height:100%; border-radius:8px; transition:width .4s; background:linear-gradient(90deg,var(--accent),var(--green)); }
+
+  /* ── JARVIS CHAT ── */
+  #page-jarvis { height:calc(100dvh - 130px); overflow:hidden; }
+  #chat-header { padding:14px 20px 12px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  #chat-messages {
+    flex:1; overflow-y:auto; padding:16px 16px 8px;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .msg { display:flex; animation:fadeIn .25s ease; }
+  .msg.user { justify-content:flex-end; }
+  .msg-bubble {
+    max-width:82%; padding:10px 14px; font-size:13.5px; line-height:1.55;
+    color:var(--text);
+  }
+  .msg.bot .msg-bubble {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:16px 16px 16px 4px;
+  }
+  .msg.user .msg-bubble {
+    background:rgba(0,212,255,.12); border:1px solid rgba(0,212,255,.3);
+    border-radius:16px 16px 4px 16px;
+  }
+  .msg-sender { color:var(--accent); font-size:10px; font-weight:700; letter-spacing:2px; margin-bottom:4px; }
+  #chat-typing { display:none; align-items:center; gap:8px; padding:0 16px; }
+  #chat-typing.show { display:flex; }
+  .typing-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 1.2s ease-in-out infinite; }
+  #chat-input-row { padding:12px 16px 16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-shrink:0; }
+  #chat-inp {
+    flex:1; background:var(--surfaceHigh); border:1px solid var(--border); border-radius:24px;
+    color:var(--text); padding:10px 16px; font-size:14px; font-family:inherit; outline:none;
+  }
+  #chat-send {
+    width:42px; height:42px; border-radius:50%; background:rgba(0,212,255,.15);
+    border:1px solid var(--accent); color:var(--accent); cursor:pointer; font-size:16px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+
+  /* ── PAGES ── */
+  .page-scroll { overflow-y:auto; }
+  .page-content { padding:16px; display:flex; flex-direction:column; gap:14px; }
+
+  .stat-row { display:flex; gap:10px; }
+  .stat-card { flex:1; text-align:center; padding:12px 8px; }
+  .stat-val { font-size:22px; font-weight:700; }
+  .stat-label { font-size:10px; color:var(--textMut); margin-top:2px; }
+
+  .list-item {
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:12px 14px; display:flex; align-items:center; gap:10px;
+    animation:fadeIn .2s ease;
+  }
+  .item-check {
+    width:24px; height:24px; border-radius:50%; border:2px solid var(--border);
+    background:transparent; cursor:pointer; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:12px;
+  }
+  .item-check.done { border-color:var(--green); background:rgba(6,255,165,.13); color:var(--green); }
+  .item-check.square { border-radius:6px; }
+  .item-main { flex:1; }
+  .item-title { font-size:14px; color:var(--text); }
+  .item-title.done { text-decoration:line-through; color:var(--textMut); }
+  .item-meta { display:flex; gap:8px; margin-top:3px; flex-wrap:wrap; }
+  .item-meta span { font-size:11px; color:var(--textSec); }
+  .badge { font-size:10px; padding:1px 6px; border-radius:4px; }
+  .del-btn { color:var(--red); background:none; border:none; cursor:pointer; font-size:18px; line-height:1; }
+
+  .form-box { display:flex; flex-direction:column; gap:10px; }
+  .form-row { display:flex; gap:8px; }
+  .form-row .inp, .form-row .sel { flex:1; }
+
+  /* Finance */
+  .balance-card { text-align:center; }
+  .balance-amount { font-size:32px; font-weight:700; margin:8px 0; }
+  .fin-row { display:flex; gap:10px; margin-top:8px; }
+  .fin-half { flex:1; text-align:center; border-radius:8px; padding:8px; }
+  .fin-val { font-size:15px; font-weight:700; }
+  .fin-label { font-size:10px; color:var(--textMut); }
+  .cat-bar-row { margin-bottom:6px; }
+  .cat-bar-header { display:flex; justify-content:space-between; margin-bottom:3px; }
+  .cat-bar-track { background:var(--surfaceHigh); border-radius:4px; height:4px; }
+  .cat-bar-fill { height:100%; background:var(--accent); border-radius:4px; }
+  .tx-icon {
+    width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+  }
+
+  .empty { text-align:center; color:var(--textMut); font-size:13px; padding:24px; }
+
+  /* Install banner */
+  #install-banner {
+    display:none; position:fixed; bottom:70px; left:16px; right:16px; z-index:100;
+    background:var(--surfaceHigh); border:1px solid var(--accent);
+    border-radius:12px; padding:14px 16px;
+    box-shadow:0 0 20px rgba(0,212,255,.2);
+    animation:fadeIn .3s ease;
+  }
+  #install-banner.show { display:block; }
+  .banner-title { color:var(--accent); font-size:12px; font-weight:600; letter-spacing:1px; margin-bottom:6px; }
+  .banner-text { color:var(--textSec); font-size:12px; line-height:1.5; margin-bottom:10px; }
+  .banner-btns { display:flex; gap:8px; }
+</style>
+</head>
+<body>
+
+<div id="scanline"></div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-left">
+      <div class="sys-label">
+        <div class="glow-dot"></div>
+        <span class="sys-title">J.A.R.V.I.S</span>
+      </div>
+      <div class="sys-date" id="sys-date"></div>
+    </div>
+    <div class="topbar-right">
+      <div class="clock" id="clock"></div>
+      <div class="sys-mini" id="sys-mini"></div>
+    </div>
+  </div>
+</div>
+
+<!-- INSTALL BANNER -->
+<div id="install-banner">
+  <div class="banner-title">⬇ INSTALAR COMO APP</div>
+  <div class="banner-text">Toque em "Instalar" para adicionar o J.A.R.V.I.S à sua tela inicial e usar offline.</div>
+  <div class="banner-btns">
+    <button class="btn btn-full" id="install-btn" style="background:rgba(0,212,255,.15);border-color:var(--accent);color:var(--accent)">Instalar App</button>
+    <button class="btn" id="dismiss-btn" style="background:transparent;border-color:var(--border);color:var(--textSec)">Depois</button>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div id="content">
+
+  <!-- PAGE: JARVIS CHAT -->
+  <div class="page active" id="page-jarvis" style="flex-direction:column;">
+    <div id="chat-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="glow-dot"></div>
+        <span style="color:var(--accent);font-size:13px;font-weight:700;letter-spacing:3px;">J.A.R.V.I.S</span>
+        <span style="color:var(--textMut);font-size:11px;margin-left:auto;">SISTEMA ONLINE</span>
+      </div>
+    </div>
+    <div id="chat-messages"></div>
+    <div id="chat-typing">
+      <div class="typing-dot" style="animation-delay:0s"></div>
+      <div class="typing-dot" style="animation-delay:.2s"></div>
+      <div class="typing-dot" style="animation-delay:.4s"></div>
+      <span style="color:var(--textSec);font-size:11px;margin-left:4px;">processando...</span>
+    </div>
+    <div id="chat-input-row">
+      <input id="chat-inp" type="text" placeholder="Fale com o J.A.R.V.I.S..."/>
+      <button id="chat-send">▶</button>
+    </div>
+  </div>
+
+  <!-- PAGE: ROTINAS -->
+  <div class="page page-scroll" id="page-rotinas">
+    <div class="page-content">
+      <!-- Progress -->
+      <div class="card" id="rotinas-progress">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span style="color:var(--textSec);font-size:12px;letter-spacing:1px;">PROGRESSO DO DIA</span>
+          <span style="color:var(--green);font-weight:700;font-size:18px;" id="rot-pct">0%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="rot-bar" style="width:0%"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;">
+          <span style="color:var(--textMut);font-size:11px;" id="rot-count">0 de 0 completas</span>
+          <button onclick="resetRotinas()" style="color:var(--textSec);font-size:11px;background:none;border:none;cursor:pointer;">Reset dia</button>
+        </div>
+      </div>
+      <!-- Filters -->
+      <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;" id="rot-filters"></div>
+      <!-- List -->
+      <div id="rot-list"></div>
+      <!-- Add form -->
+      <div id="rot-form" style="display:none;" class="card form-box">
+        <input class="inp" id="rot-title" placeholder="Nome da rotina"/>
+        <div class="form-row">
+          <input class="inp" type="time" id="rot-time"/>
+          <select class="sel" id="rot-repeat">
+            <option value="daily">Diário</option>
+            <option value="weekly">Semanal</option>
+            <option value="once">Uma vez</option>
+          </select>
+        </div>
+        <select class="sel" id="rot-cat">
+          <option>Casa</option><option>Trabalho</option><option>Saúde</option><option>Estudos</option><option selected>Pessoal</option>
+        </select>
+        <div class="form-row">
+          <button class="btn btn-full" onclick="saveRotina()" style="background:rgba(6,255,165,.13);border-color:var(--green);color:var(--green)">Salvar</button>
+          <button class="btn" onclick="toggleRotForm(false)" style="background:transparent;border-color:var(--border);color:var(--textSec)">Cancelar</button>
+        </div>
+      </div>
+      <button class="btn btn-full" id="rot-add-btn" onclick="toggleRotForm(true)" style="background:rgba(6,255,165,.13);border-color:var(--green);color:var(--green)">+ Nova Rotina</button>
+    </div>
+  </div>
+
+  <!-- PAGE: LEMBRETES -->
+  <div class="page page-scroll" id="page-lembretes">
+    <div class="page-content">
+      <!-- Stats -->
+      <div class="stat-row" id="lem-stats"></div>
+      <!-- Filters -->
+      <div style="display:flex;gap:6px;" id="lem-filters"></div>
+      <!-- List -->
+      <div id="lem-list"></div>
+      <!-- Add form -->
+      <div id="lem-form" style="display:none;" class="card form-box">
+        <input class="inp" id="lem-title" placeholder="Título do lembrete"/>
+        <div class="form-row">
+          <input class="inp" type="date" id="lem-date"/>
+          <input class="inp" type="time" id="lem-time"/>
+        </div>
+        <div class="form-row">
+          <select class="sel" id="lem-priority">
+            <option value="high">Alta</option>
+            <option value="medium" selected>Média</option>
+            <option value="low">Baixa</option>
+          </select>
+          <select class="sel" id="lem-cat">
+            <option>Casa</option><option>Trabalho</option><option>Saúde</option><option>Estudos</option><option selected>Pessoal</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <button class="btn btn-full" onclick="saveLembrete()" style="background:rgba(255,209,102,.13);border-color:var(--gold);color:var(--gold)">Salvar</button>
+          <button class="btn" onclick="toggleLemForm(false)" style="background:transparent;border-color:var(--border);color:var(--textSec)">Cancelar</button>
+        </div>
+      </div>
+      <button class="btn btn-full" id="lem-add-btn" onclick="toggleLemForm(true)" style="background:rgba(255,209,102,.13);border-color:var(--gold);color:var(--gold)">+ Novo Lembrete</button>
+    </div>
+  </div>
+
+  <!-- PAGE: FINANCEIRO -->
+  <div class="page page-scroll" id="page-financeiro">
+    <div class="page-content">
+      <div class="card balance-card" id="fin-balance"></div>
+      <div class="card" id="fin-cats" style="display:none;">
+        <div style="color:var(--textSec);font-size:11px;letter-spacing:1px;margin-bottom:10px;">DESPESAS POR CATEGORIA</div>
+        <div id="fin-cats-list"></div>
+      </div>
+      <div style="display:flex;gap:6px;" id="fin-filters"></div>
+      <div id="fin-list"></div>
+      <!-- Add form -->
+      <div id="fin-form" style="display:none;" class="card form-box">
+        <div class="form-row" id="fin-type-row">
+          <button class="btn btn-full" id="fin-type-exp" onclick="setFinType('expense')" style="background:rgba(255,77,109,.2);border-color:var(--red);color:var(--red)">▶ Despesa</button>
+          <button class="btn btn-full" id="fin-type-inc" onclick="setFinType('income')" style="background:transparent;border-color:var(--border);color:var(--textSec)">Receita</button>
+        </div>
+        <input class="inp" id="fin-desc" placeholder="Descrição"/>
+        <input class="inp" type="number" id="fin-amount" placeholder="Valor (R$)" min="0" step="0.01"/>
+        <select class="sel" id="fin-cat">
+          <option>Alimentação</option><option>Transporte</option><option>Moradia</option><option>Lazer</option><option>Saúde</option><option>Outros</option>
+        </select>
+        <div class="form-row">
+          <button class="btn btn-full" onclick="saveTransaction()" style="background:rgba(0,212,255,.13);border-color:var(--accent);color:var(--accent)">Salvar</button>
+          <button class="btn" onclick="toggleFinForm(false)" style="background:transparent;border-color:var(--border);color:var(--textSec)">Cancelar</button>
+        </div>
+      </div>
+      <button class="btn btn-full" id="fin-add-btn" onclick="toggleFinForm(true)" style="background:rgba(0,212,255,.13);border-color:var(--accent);color:var(--accent)">+ Nova Transação</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<nav id="bottomnav">
+  <button class="nav-btn active" style="--nav-color:var(--accent)" onclick="goTo('jarvis',this)">
+    <span class="nav-icon">⬡</span>
+    <span class="nav-label">J.A.R.V.I.S</span>
+  </button>
+  <button class="nav-btn" style="--nav-color:var(--green)" onclick="goTo('rotinas',this)">
+    <span class="nav-icon">◈</span>
+    <span class="nav-label">ROTINAS</span>
+  </button>
+  <button class="nav-btn" style="--nav-color:var(--gold)" onclick="goTo('lembretes',this)">
+    <span class="nav-icon">◉</span>
+    <span class="nav-label">LEMBRETES</span>
+  </button>
+  <button class="nav-btn" style="--nav-color:var(--accent)" onclick="goTo('financeiro',this)">
+    <span class="nav-icon">◆</span>
+    <span class="nav-label">FINANÇAS</span>
+  </button>
+</nav>
+
+<script>
+// ── STORAGE ──────────────────────────────────────────────────────────────────
+const S = {
+  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+};
+
+let rotinas = S.get('jv_rotinas') || [];
+let lembretes = S.get('jv_lembretes') || [];
+let transactions = S.get('jv_transactions') || [];
+let finType = 'expense';
+let rotFilter = 'Todas';
+let lemFilter = 'todos';
+let finFilter = 'all';
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('sys-date').textContent = now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'short'});
+  updateMini();
+}
+function updateMini() {
+  const pending = (lembretes||[]).filter(r=>!r.done).length;
+  const doneR = (rotinas||[]).filter(r=>r.done).length;
+  document.getElementById('sys-mini').textContent = `${doneR} rotinas · ${pending} lembretes`;
+}
+updateClock(); setInterval(updateClock, 1000);
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────────
+function goTo(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'rotinas') renderRotinas();
+  if (id === 'lembretes') renderLembretes();
+  if (id === 'financeiro') renderFinanceiro();
+}
+
+// ── JARVIS CHAT ───────────────────────────────────────────────────────────────
+const chatEl = document.getElementById('chat-messages');
+const chatInp = document.getElementById('chat-inp');
+let chatHistory = [];
+
+function addMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  if (role === 'assistant') {
+    const sender = document.createElement('div');
+    sender.className = 'msg-sender';
+    sender.textContent = 'JARVIS';
+    bubble.appendChild(sender);
+  }
+  const txt = document.createElement('div');
+  txt.textContent = text;
+  bubble.appendChild(txt);
+  div.appendChild(bubble);
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function buildCtx() {
+  const inc = (transactions||[]).filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
+  const exp = (transactions||[]).filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+  const pending = (lembretes||[]).filter(r=>!r.done).length;
+  const done = (rotinas||[]).filter(r=>r.done).length;
+  return `Você é J.A.R.V.I.S., assistente pessoal de alta performance do usuário. Responda sempre em português do Brasil, de forma concisa e estratégica como um parceiro técnico.
+Contexto atual:
+- Rotinas completas hoje: ${done}/${(rotinas||[]).length}
+- Lembretes pendentes: ${pending}
+- Receitas: R$${inc.toFixed(2)} | Despesas: R$${exp.toFixed(2)} | Saldo: R$${(inc-exp).toFixed(2)}
+Ajude com rotinas, produtividade, lembretes e finanças. Seja direto e útil.`;
+}
+
+async function sendChat() {
+  const text = chatInp.value.trim();
+  if (!text) return;
+  chatInp.value = '';
+  addMsg('user', text);
+  chatHistory.push({ role: 'user', content: text });
+  document.getElementById('chat-typing').classList.add('show');
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: buildCtx(),
+        messages: chatHistory,
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || 'Erro na resposta.';
+    chatHistory.push({ role: 'assistant', content: reply });
+    document.getElementById('chat-typing').classList.remove('show');
+    addMsg('assistant', reply);
+  } catch {
+    document.getElementById('chat-typing').classList.remove('show');
+    addMsg('assistant', 'Erro de conexão. Verifique sua internet.');
+  }
+}
+
+document.getElementById('chat-send').onclick = sendChat;
+chatInp.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+// Initial message
+addMsg('assistant', 'Sistema online. Sou seu J.A.R.V.I.S. pessoal. Como posso otimizar seu dia?');
+
+// ── ROTINAS ───────────────────────────────────────────────────────────────────
+const CATS = ['Todas','Casa','Trabalho','Saúde','Estudos','Pessoal'];
+const REPEAT = { daily:'Diário', weekly:'Semanal', once:'Uma vez' };
+
+function renderRotinas() {
+  const done = rotinas.filter(r=>r.done).length;
+  const pct = rotinas.length ? Math.round((done/rotinas.length)*100) : 0;
+  document.getElementById('rot-pct').textContent = pct + '%';
+  document.getElementById('rot-bar').style.width = pct + '%';
+  document.getElementById('rot-count').textContent = `${done} de ${rotinas.length} completas`;
+
+  // Filters
+  const fEl = document.getElementById('rot-filters');
+  fEl.innerHTML = '';
+  CATS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'pill' + (rotFilter === c ? ' active' : '');
+    b.style.setProperty('--pill-color','var(--green)');
+    b.textContent = c;
+    b.onclick = () => { rotFilter = c; renderRotinas(); };
+    fEl.appendChild(b);
+  });
+
+  // List
+  const list = document.getElementById('rot-list');
+  list.innerHTML = '';
+  const filtered = rotFilter === 'Todas' ? rotinas : rotinas.filter(r=>r.category===rotFilter);
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">Nenhuma rotina. Adicione uma abaixo.</div>';
+    return;
+  }
+  filtered.forEach(r => {
+    const d = document.createElement('div');
+    d.className = 'list-item';
+    d.innerHTML = `
+      <button class="item-check${r.done?' done':''}" onclick="toggleRotina(${r.id})">${r.done?'✓':''}</button>
+      <div class="item-main">
+        <div class="item-title${r.done?' done':''}">${r.title}</div>
+        <div class="item-meta">
+          ${r.time?`<span>⏰ ${r.time}</span>`:''}
+          <span>↻ ${REPEAT[r.repeat]||r.repeat}</span>
+          ${r.streak>0?`<span style="color:var(--gold)">🔥 ${r.streak}</span>`:''}
+        </div>
+      </div>
+      <span class="badge" style="background:var(--surfaceHigh);color:var(--textMut)">${r.category}</span>
+      <button class="del-btn" onclick="deleteRotina(${r.id})">×</button>`;
+    list.appendChild(d);
+  });
+}
+
+function toggleRotForm(show) {
+  document.getElementById('rot-form').style.display = show ? 'flex' : 'none';
+  document.getElementById('rot-add-btn').style.display = show ? 'none' : 'block';
+  if (show) { document.getElementById('rot-title').value=''; document.getElementById('rot-time').value=''; }
+}
+function saveRotina() {
+  const title = document.getElementById('rot-title').value.trim();
+  if (!title) return;
+  rotinas.push({ id: Date.now(), title, time: document.getElementById('rot-time').value, category: document.getElementById('rot-cat').value, repeat: document.getElementById('rot-repeat').value, done: false, streak: 0 });
+  S.set('jv_rotinas', rotinas);
+  toggleRotForm(false);
+  renderRotinas();
+}
+function toggleRotina(id) {
+  rotinas = rotinas.map(r => r.id===id ? {...r, done:!r.done, streak:!r.done?r.streak+1:r.streak} : r);
+  S.set('jv_rotinas', rotinas);
+  renderRotinas(); updateMini();
+}
+function deleteRotina(id) {
+  rotinas = rotinas.filter(r=>r.id!==id);
+  S.set('jv_rotinas', rotinas);
+  renderRotinas();
+}
+function resetRotinas() {
+  rotinas = rotinas.map(r=>({...r,done:false}));
+  S.set('jv_rotinas', rotinas);
+  renderRotinas();
+}
+
+// ── LEMBRETES ─────────────────────────────────────────────────────────────────
+const PRIORITY = { high:{label:'Alta',color:'var(--red)'}, medium:{label:'Média',color:'var(--gold)'}, low:{label:'Baixa',color:'var(--green)'} };
+
+function renderLembretes() {
+  const pending = lembretes.filter(r=>!r.done).length;
+  const stats = document.getElementById('lem-stats');
+  stats.innerHTML = [
+    {label:'Pendentes',val:pending,color:'var(--gold)'},
+    {label:'Feitos',val:lembretes.length-pending,color:'var(--green)'},
+    {label:'Total',val:lembretes.length,color:'var(--accent)'},
+  ].map(s=>`<div class="card stat-card"><div class="stat-val" style="color:${s.color}">${s.val}</div><div class="stat-label">${s.label}</div></div>`).join('');
+
+  // Filters
+  const fEl = document.getElementById('lem-filters');
+  fEl.innerHTML = '';
+  [['todos','Todos'],['pendentes','Pendentes'],['concluidos','Feitos']].forEach(([v,l])=>{
+    const b = document.createElement('button');
+    b.className = 'pill' + (lemFilter===v?' active':'');
+    b.style.setProperty('--pill-color','var(--gold)');
+    b.textContent = l;
+    b.onclick = () => { lemFilter = v; renderLembretes(); };
+    fEl.appendChild(b);
+  });
+
+  // List
+  const list = document.getElementById('lem-list');
+  list.innerHTML = '';
+  const po = {high:0,medium:1,low:2};
+  const filtered = [...(lemFilter==='todos'?lembretes:lemFilter==='pendentes'?lembretes.filter(r=>!r.done):lembretes.filter(r=>r.done))].sort((a,b)=>po[a.priority]-po[b.priority]);
+  if (!filtered.length) { list.innerHTML='<div class="empty">Sem lembretes aqui.</div>'; return; }
+  filtered.forEach(r => {
+    const p = PRIORITY[r.priority];
+    const d = document.createElement('div');
+    d.className = 'list-item'; d.style.alignItems = 'flex-start';
+    d.innerHTML = `
+      <button class="item-check square${r.done?' done':''}" style="margin-top:2px;border-color:${r.done?p.color:'var(--border)'};${r.done?'background:color-mix(in srgb,'+p.color+' 15%,transparent);color:'+p.color:''}" onclick="toggleLembrete(${r.id})">${r.done?'✓':''}</button>
+      <div class="item-main">
+        <div class="item-title${r.done?' done':''}">${r.title}</div>
+        <div class="item-meta">
+          ${r.date?`<span>📅 ${r.date}${r.time?' às '+r.time:''}</span>`:''}
+          <span class="badge" style="color:${p.color};background:color-mix(in srgb,${p.color} 15%,transparent)">${p.label}</span>
+          <span>${r.category}</span>
+        </div>
+      </div>
+      <button class="del-btn" onclick="deleteLembrete(${r.id})">×</button>`;
+    list.appendChild(d);
+  });
+}
+
+function toggleLemForm(show) {
+  document.getElementById('lem-form').style.display = show ? 'flex' : 'none';
+  document.getElementById('lem-add-btn').style.display = show ? 'none' : 'block';
+}
+function saveLembrete() {
+  const title = document.getElementById('lem-title').value.trim();
+  if (!title) return;
+  lembretes.push({ id:Date.now(), title, date:document.getElementById('lem-date').value, time:document.getElementById('lem-time').value, priority:document.getElementById('lem-priority').value, category:document.getElementById('lem-cat').value, done:false });
+  S.set('jv_lembretes', lembretes);
+  toggleLemForm(false);
+  renderLembretes(); updateMini();
+}
+function toggleLembrete(id) {
+  lembretes = lembretes.map(r=>r.id===id?{...r,done:!r.done}:r);
+  S.set('jv_lembretes', lembretes);
+  renderLembretes(); updateMini();
+}
+function deleteLembrete(id) {
+  lembretes = lembretes.filter(r=>r.id!==id);
+  S.set('jv_lembretes', lembretes);
+  renderLembretes();
+}
+
+// ── FINANCEIRO ────────────────────────────────────────────────────────────────
+const FIN_CATS = ['Alimentação','Transporte','Moradia','Lazer','Saúde','Outros'];
+const fmt = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+
+function setFinType(type) {
+  finType = type;
+  const expBtn = document.getElementById('fin-type-exp');
+  const incBtn = document.getElementById('fin-type-inc');
+  if (type==='expense') {
+    expBtn.style.cssText='background:rgba(255,77,109,.2);border-color:var(--red);color:var(--red)';
+    incBtn.style.cssText='background:transparent;border-color:var(--border);color:var(--textSec)';
+  } else {
+    incBtn.style.cssText='background:rgba(6,255,165,.2);border-color:var(--green);color:var(--green)';
+    expBtn.style.cssText='background:transparent;border-color:var(--border);color:var(--textSec)';
+  }
+}
+
+function renderFinanceiro() {
+  const inc = transactions.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
+  const exp = transactions.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+  const bal = inc - exp;
+  const isPos = bal >= 0;
+  document.getElementById('fin-balance').innerHTML = `
+    <div style="color:var(--textSec);font-size:11px;letter-spacing:2px;">SALDO ATUAL</div>
+    <div class="balance-amount" style="color:${isPos?'var(--green)':'var(--red)'}">${fmt(bal)}</div>
+    <div class="fin-row">
+      <div class="fin-half" style="background:rgba(6,255,165,.08)">
+        <div class="fin-val" style="color:var(--green)">${fmt(inc)}</div>
+        <div class="fin-label">Receitas</div>
+      </div>
+      <div class="fin-half" style="background:rgba(255,77,109,.08)">
+        <div class="fin-val" style="color:var(--red)">${fmt(exp)}</div>
+        <div class="fin-label">Despesas</div>
+      </div>
+    </div>`;
+
+  // Category breakdown
+  const catData = FIN_CATS.map(c=>({ c, total:transactions.filter(t=>t.category===c&&t.type==='expense').reduce((a,t)=>a+t.amount,0) })).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
+  const catBox = document.getElementById('fin-cats');
+  const catList = document.getElementById('fin-cats-list');
+  catBox.style.display = catData.length ? 'block' : 'none';
+  catList.innerHTML = catData.map(c=>`
+    <div class="cat-bar-row">
+      <div class="cat-bar-header"><span style="color:var(--textSec);font-size:12px">${c.c}</span><span style="color:var(--text);font-size:12px">${fmt(c.total)}</span></div>
+      <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${exp>0?(c.total/exp*100):0}%"></div></div>
+    </div>`).join('');
+
+  // Filters
+  const fEl = document.getElementById('fin-filters');
+  fEl.innerHTML = '';
+  [['all','Tudo'],['income','Receitas'],['expense','Despesas']].forEach(([v,l])=>{
+    const b = document.createElement('button');
+    b.className = 'pill'+(finFilter===v?' active':'');
+    b.style.setProperty('--pill-color','var(--accent)');
+    b.textContent = l;
+    b.onclick = () => { finFilter = v; renderFinanceiro(); };
+    fEl.appendChild(b);
+  });
+
+  // List
+  const list = document.getElementById('fin-list');
+  list.innerHTML = '';
+  const filtered = [...(finFilter==='all'?transactions:transactions.filter(t=>t.type===finFilter))].reverse();
+  if (!filtered.length) { list.innerHTML='<div class="empty">Nenhuma transação registrada.</div>'; return; }
+  filtered.forEach(t => {
+    const isInc = t.type==='income';
+    const d = document.createElement('div');
+    d.className = 'list-item';
+    d.innerHTML = `
+      <div class="tx-icon" style="background:${isInc?'rgba(6,255,165,.15)':'rgba(255,77,109,.15)'}">${isInc?'↑':'↓'}</div>
+      <div class="item-main">
+        <div class="item-title">${t.desc}</div>
+        <div class="item-meta"><span>${t.category} · ${t.date}</span></div>
+      </div>
+      <div style="text-align:right">
+        <div style="color:${isInc?'var(--green)':'var(--red)'};font-weight:700;font-size:14px">${isInc?'+':'-'}${fmt(t.amount)}</div>
+      </div>
+      <button class="del-btn" onclick="deleteTransaction(${t.id})">×</button>`;
+    list.appendChild(d);
+  });
+}
+
+function toggleFinForm(show) {
+  document.getElementById('fin-form').style.display = show ? 'flex' : 'none';
+  document.getElementById('fin-add-btn').style.display = show ? 'none' : 'block';
+  if (show) { document.getElementById('fin-desc').value=''; document.getElementById('fin-amount').value=''; }
+}
+function saveTransaction() {
+  const desc = document.getElementById('fin-desc').value.trim();
+  const amount = parseFloat(document.getElementById('fin-amount').value);
+  if (!desc || !amount) return;
+  transactions.push({ id:Date.now(), desc, amount, type:finType, category:document.getElementById('fin-cat').value, date:new Date().toLocaleDateString('pt-BR') });
+  S.set('jv_transactions', transactions);
+  toggleFinForm(false);
+  renderFinanceiro();
+}
+function deleteTransaction(id) {
+  transactions = transactions.filter(t=>t.id!==id);
+  S.set('jv_transactions', transactions);
+  renderFinanceiro();
+}
+
+// ── PWA INSTALL ───────────────────────────────────────────────────────────────
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  setTimeout(() => document.getElementById('install-banner').classList.add('show'), 2000);
+});
+document.getElementById('install-btn').onclick = async () => {
+  if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; deferredPrompt = null; }
+  document.getElementById('install-banner').classList.remove('show');
+};
+document.getElementById('dismiss-btn').onclick = () => document.getElementById('install-banner').classList.remove('show');
+
+// Service Worker para offline
+if ('serviceWorker' in navigator) {
+  const sw = `
+    const CACHE = 'jarvis-v1';
+    self.addEventListener('install', e => { self.skipWaiting(); });
+    self.addEventListener('fetch', e => {
+      if (e.request.url.includes('api.anthropic.com') || e.request.url.includes('fonts.googleapis.com')) return;
+      e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    });
+  `;
+  const blob = new Blob([sw], {type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+</script>
+</body>
+</html>
